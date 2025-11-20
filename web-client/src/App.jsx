@@ -1,163 +1,194 @@
 // web-client/src/App.jsx
 import { useState } from 'react'
 import axios from 'axios'
+import { Leaf, Activity, Zap, Award, AlertTriangle, Globe, ArrowRight, CheckCircle, ChevronDown } from 'lucide-react'
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Doughnut } from 'react-chartjs-2';
+import './App.css';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 function App() {
   const [url, setUrl] = useState('')
-  const [region, setRegion] = useState('global') // Default region
+  const [region, setRegion] = useState('global') 
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
 
   const handleAudit = async () => {
-    // Basic Validation
     if (!url) return alert("Please enter a URL")
-    
-    setLoading(true)
-    setError(null)
-    setResult(null)
+    setLoading(true); setError(null); setResult(null);
 
     try {
-      // THE API CALL
-      // We talk to Python on port 8000
       const response = await axios.post('http://localhost:8000/audit', {
         url: url,
         region: region
       })
-
       setResult(response.data)
     } catch (err) {
       console.error(err)
-      setError("Audit failed. Is the backend running?")
+      setError("Connection Failed. Ensure backend is running on port 8000.")
     } finally {
       setLoading(false)
     }
   }
 
+  // --- THIS IS THE MISSING PART ---
+  const handleReset = () => {
+    setResult(null);
+    setUrl('');
+    setError(null);
+  }
+  // -------------------------------
+
+  const getChartData = () => {
+    if (!result || !result.network_metrics) return null;
+    const r = result.network_metrics.breakdown;
+    return {
+      labels: ['Images', 'Scripts', 'CSS', 'Other'],
+      datasets: [{
+        data: [r.image, r.script, r.stylesheet, r.other],
+        backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#64748b'],
+        borderWidth: 0,
+        cutout: '75%',
+      }],
+    };
+  };
+
+  const getGradeColor = (g) => g === 'A' ? '#10b981' : (g === 'B' ? '#f59e0b' : '#ef4444');
+
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '50px', fontFamily: 'sans-serif' }}>
-      <h1 style={{ color: '#2c3e50' }}>🌱 EcoAudit Dashboard</h1>
-      
-      {/* INPUT SECTION */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <input 
-          type="text" 
-          placeholder="https://example.com" 
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          style={{ flex: 1, padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
-        />
-        
-        <select 
-          value={region} 
-          onChange={(e) => setRegion(e.target.value)}
-          style={{ padding: '10px', borderRadius: '5px' }}
-        >
-          <option value="global">🌍 Global Avg</option>
-          <option value="in">🇮🇳 India</option>
-          <option value="fr">🇫🇷 France</option>
-          <option value="us">🇺🇸 USA</option>
-        </select>
+    <div className="container">
+      {/* NAVBAR with Working Button */}
+      <nav className="navbar">
+        <div className="logo" onClick={handleReset} style={{cursor: 'pointer'}}>
+          <Leaf size={28} /> EcoAudit
+        </div>
+        {/* Only show button if we have results */}
+        {result && (
+          <button className="btn-outline" onClick={handleReset}>
+            New Audit
+          </button>
+        )}
+      </nav>
 
-        <button 
-          onClick={handleAudit}
-          disabled={loading}
-          style={{ 
-            padding: '10px 20px', 
-            background: loading ? '#ccc' : '#27ae60', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '5px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Scanning...' : 'Audit Now'}
-        </button>
-      </div>
+      {/* HERO SECTION */}
+      {!result && (
+        <div className="hero-section animate-fade-in">
+          <div className="hero-icon-wrapper">
+             <Leaf size={48} color="#10b981" />
+          </div>
+          <h1 className="hero-title">
+            <span style={{ color: '#10b981' }}>Eco</span>Audit
+          </h1>
+          <p className="hero-subtitle">
+            Measure, Predict, and Reduce your Digital Carbon Footprint
+          </p>
 
-      {/* ERROR MESSAGE */}
-      {error && <div style={{ color: 'red', marginBottom: '20px' }}>{error}</div>}
+          <div className="search-box">
+            <input 
+              type="text" 
+              className="search-input"
+              placeholder="Enter website URL (e.g., https://google.com)"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            
+            {/* IMPROVED DROPDOWN WRAPPER */}
+            <div className="select-wrapper">
+              <select 
+                className="search-select"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+              >
+                <option value="global">🌍 Global</option>
+                <option value="in">🇮🇳 India</option>
+                <option value="fr">🇫🇷 France</option>
+                <option value="us">🇺🇸 USA</option>
+              </select>
+              <ChevronDown className="select-icon" size={16} />
+            </div>
 
-      {/* RESULTS SECTION */}
+            <button className="btn-primary" onClick={handleAudit} disabled={loading}>
+              {loading ? 'Scanning...' : 'Scan Now'}
+            </button>
+          </div>
+          {error && <div className="error-msg">{error}</div>}
+        </div>
+      )}
+
+      {/* RESULTS DASHBOARD */}
       {result && (
-        <div style={{ border: '1px solid #ddd', borderRadius: '10px', padding: '20px', background: '#f9f9f9' }}>
-          <h2>📊 Audit Report</h2>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', textAlign: 'center' }}>
-            {/* Grade Card */}
-            <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-              <div style={{ fontSize: '14px', color: '#777' }}>Sustainability Grade</div>
-              <div style={{ fontSize: '40px', fontWeight: 'bold', color: result.grade === 'A' ? '#27ae60' : '#e74c3c' }}>
+        <div className="dashboard animate-slide-up">
+          <div className="stats-grid">
+            <div className="stat-card" style={{ borderColor: getGradeColor(result.grade) }}>
+              <div className="stat-header">
+                Sustainability Grade <Award size={18} color={getGradeColor(result.grade)} />
+              </div>
+              <div className="stat-value" style={{ color: getGradeColor(result.grade), fontSize: '3.5rem' }}>
                 {result.grade}
               </div>
+              <div className="stat-sub">{result.grade === 'A' ? 'Excellent Work' : 'Needs Improvement'}</div>
             </div>
 
-            {/* CO2 Card */}
-            <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-              <div style={{ fontSize: '14px', color: '#777' }}>Carbon Footprint</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {result.co2_grams.toFixed(3)} g
+            <div className="stat-card">
+              <div className="stat-header">Carbon Footprint <Activity size={18} color="#ef4444" /></div>
+              <div className="stat-value">
+                {result.co2_grams.toFixed(2)}<span className="unit">g</span>
               </div>
-              <div style={{ fontSize: '12px', color: '#999' }}>CO2e per visit</div>
+              <div className="stat-sub">CO2e per visit</div>
             </div>
 
-            {/* Energy Card */}
-            <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-              <div style={{ fontSize: '14px', color: '#777' }}>Page Weight</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {(result.total_bytes / 1024).toFixed(1)} KB
+            <div className="stat-card">
+              <div className="stat-header">Page Weight <Globe size={18} color="#3b82f6" /></div>
+              <div className="stat-value">
+                {(result.total_bytes / (1024*1024)).toFixed(2)}<span className="unit">MB</span>
               </div>
+              <div className="stat-sub">Total resources loaded</div>
             </div>
-            {/* ML Prediction Card */}
-            <div style={{ padding: '15px', background: '#e8f6f3', borderRadius: '8px', border: '1px solid #27ae60' }}>
-              <div style={{ fontSize: '14px', color: '#27ae60', fontWeight: 'bold' }}>🤖 AI Projection</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {result.annual_projection_kg?.toFixed(2)} kg
+
+            <div className="stat-card ai-card">
+              <div className="stat-header" style={{ color: '#10b981' }}>
+                AI Annual Projection <Zap size={18} />
               </div>
-              <div style={{ fontSize: '12px', color: '#555' }}>Annual CO2 (Predicted)</div>
+              <div className="stat-value" style={{ color: '#10b981' }}>
+                {result.annual_projection_kg?.toFixed(1)}<span className="unit">kg</span>
+              </div>
+              <div className="stat-sub">Projected annual emission</div>
             </div>
           </div>
-          
 
-          <p style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-            *Calculated using {result.region.toUpperCase()} grid intensity ({result.energy_kwh.toFixed(6)} kWh energy usage).
-          </p>
-          {/* --- NEW ACTION PLAN SECTION --- */}
-          {result.recommendations && result.recommendations.length > 0 && (
-            <div style={{ marginTop: '30px', textAlign: 'left' }}>
-              <h3>🛠️ Optimization Action Plan</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                
-                {result.recommendations.map((rec, index) => (
-                  <div key={index} style={{ 
-                    border: '1px solid #eee', 
-                    padding: '15px', 
-                    borderRadius: '8px',
-                    borderLeft: rec.priority === 'High' ? '5px solid #e74c3c' : '5px solid #f1c40f',
-                    background: 'white'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <strong style={{ fontSize: '16px' }}>{rec.title}</strong>
-                      <span style={{ 
-                        fontSize: '12px', 
-                        background: rec.priority === 'High' ? '#ffebee' : '#fff8e1',
-                        color: rec.priority === 'High' ? '#c62828' : '#f57f17',
-                        padding: '2px 8px',
-                        borderRadius: '10px'
-                      }}>
-                        {rec.priority} Priority
-                      </span>
+          <div className="dashboard-row">
+            <div className="content-card">
+              <h3>Resource Breakdown</h3>
+              {result.network_metrics ? (
+                <div className="chart-container">
+                   <Doughnut data={getChartData()} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }} />
+                </div>
+              ) : (
+                <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Chart data unavailable</p>
+              )}
+            </div>
+
+            <div className="content-card">
+              <h3>Optimization Action Plan</h3>
+              <div className="action-list">
+                {result.recommendations?.map((rec, index) => (
+                  <div key={index} className="action-item">
+                    <div className="action-header">
+                      {rec.priority === 'High' ? <AlertTriangle size={20} color="#ef4444" /> : <CheckCircle size={20} color="#f59e0b" />}
+                      <strong>{rec.title}</strong>
+                      <span className={`badge badge-${rec.priority.toLowerCase()}`}>{rec.priority}</span>
                     </div>
-                    <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#555' }}>{rec.desc}</p>
-                    <div style={{ fontSize: '13px', color: '#27ae60', fontWeight: 'bold' }}>
-                      🌱 {rec.impact}
+                    <p>{rec.desc}</p>
+                    <div className="impact-pill">
+                      <Zap size={14} fill="#10b981" /> {rec.impact}
                     </div>
                   </div>
                 ))}
-
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
