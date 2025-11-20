@@ -45,37 +45,40 @@ GRID_INTENSITY_MAP = {
 
 # core-api/main.py (Partial Update)
 
-@app.post("/audit") # Remember: No response_model=ScanResult
+@app.post("/audit")
 async def perform_full_audit(
     request: AuditRequest, 
     db: Session = Depends(get_session)
 ):
-    # ... (Scanning and Math logic remains the same) ...
-    # ... (Calculations for size_gb, energy_kwh, carbon_grams are the same) ...
+    print(f"🌐 Starting Audit for: {request.url}")
 
-    # --- RE-ADD THIS PART IF YOU DELETED IT IN PREVIOUS STEPS ---
-    # 1. Call Scanner
+    # 1. Call Scanner & Extract ALL Metrics
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(SCANNER_URL, json={"url": request.url}, timeout=30.0)
             response.raise_for_status()
             scan_data = response.json()
             
+            # Extract metrics for Math AND Chart
             total_bytes = scan_data['metrics']['totalBytes']
-            img_bytes = scan_data['metrics']['resources'].get('image', 0)
-            script_bytes = scan_data['metrics']['resources'].get('script', 0)
+            resources = scan_data['metrics']['resources']
+            
+            img_bytes = resources.get('image', 0)
+            script_bytes = resources.get('script', 0)
+            stylesheet_bytes = resources.get('stylesheet', 0)
+            other_bytes = resources.get('other', 0)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scanner Failed: {str(e)}")
-    
-    # 2. Math
+
+    # 2. Calculate Logic (Math)
     region_key = request.region.lower()
     carbon_intensity = GRID_INTENSITY_MAP.get(region_key, GRID_INTENSITY_MAP["global"])
+    
     size_gb = total_bytes / (1024 * 1024 * 1024)
     energy_kwh = size_gb * KWH_PER_GB
     carbon_grams = energy_kwh * carbon_intensity
     grade = "A" if carbon_grams < 0.5 else ("B" if carbon_grams < 1.0 else "F")
-
-    # --- NEW CODE STARTS HERE ---
 
     # 3. ML Prediction & Analysis
     annual_projection_kg = predictor.predict_annual_kg(total_bytes, img_bytes, script_bytes)
@@ -94,9 +97,21 @@ async def perform_full_audit(
     db.commit()
     db.refresh(scan_entry)
 
-    # 5. Return Custom Response
+    # 5. Construct the Final Response
     response_data = scan_entry.model_dump()
+    
+    # Attach the extras (ML + Action Plan)
     response_data['annual_projection_kg'] = annual_projection_kg
-    response_data['recommendations'] = recommendations # <--- Sending the list!
+    response_data['recommendations'] = recommendations
+    
+    # Attach the Chart Data (This fixes the empty chart!)
+    response_data['network_metrics'] = {
+        "breakdown": {
+            "image": img_bytes,
+            "script": script_bytes,
+            "stylesheet": stylesheet_bytes,
+            "other": other_bytes
+        }
+    }
     
     return response_data
