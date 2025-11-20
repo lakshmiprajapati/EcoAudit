@@ -1,19 +1,19 @@
 // web-client/src/App.jsx
 import { useState } from 'react'
 import axios from 'axios'
-import { Leaf, Activity, Zap, Award, AlertTriangle, Globe, ArrowRight, CheckCircle, ChevronDown, Code } from 'lucide-react'
+import { Leaf, Activity, Zap, Award, AlertTriangle, Globe, CheckCircle, ChevronDown, Code, BarChart3, BrainCircuit, GitMerge } from 'lucide-react'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import './App.css';
-import Integration from './Integration'; // Import the new page
-
+import Integration from './Integration';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 function App() {
-  // ROUTING STATE: 'dashboard' or 'integration'
+  // Routing State
   const [currentView, setCurrentView] = useState('dashboard');
   
+  // App State
   const [url, setUrl] = useState('')
   const [region, setRegion] = useState('global') 
   const [loading, setLoading] = useState(false)
@@ -73,7 +73,6 @@ function App() {
         </div>
         
         <div style={{ display: 'flex', gap: '10px' }}>
-          {/* Integration Toggle Button */}
           <button 
             className="btn-outline" 
             style={{ borderColor: currentView === 'integration' ? '#10b981' : '', color: currentView === 'integration' ? '#10b981' : '' }}
@@ -98,8 +97,8 @@ function App() {
       {currentView === 'integration' ? (
         <Integration />
       ) : (
-        // --- EXISTING DASHBOARD CODE ---
         <>
+          {/* LANDING PAGE */}
           {!result && (
             <div className="hero-section animate-fade-in">
               <div className="hero-icon-wrapper">
@@ -140,9 +139,38 @@ function App() {
                 </button>
               </div>
               {error && <div className="error-msg">{error}</div>}
+
+              {/* FEATURES GRID (Scroll to see) */}
+              <div className="features-grid">
+                <div className="feature-card">
+                  <div className="feature-icon" style={{ background: '#1e3a8a' }}>
+                    <BarChart3 size={24} color="#ffffff" />
+                  </div>
+                  <h3>Real-Time Grid Data</h3>
+                  <p>Dynamic carbon intensity based on actual energy grids, not static averages.</p>
+                </div>
+
+                <div className="feature-card">
+                  <div className="feature-icon" style={{ background: '#10b981' }}>
+                    <BrainCircuit size={24} color="#ffffff" />
+                  </div>
+                  <h3>ML-Powered Predictions</h3>
+                  <p>Annual emissions forecasting based on traffic patterns and usage data.</p>
+                </div>
+
+                <div className="feature-card">
+                  <div className="feature-icon" style={{ background: '#f97316' }}>
+                    <GitMerge size={24} color="#ffffff" />
+                  </div>
+                  <h3>CI/CD Integration</h3>
+                  <p>Prevent carbon regressions with automated pipeline thresholds.</p>
+                </div>
+              </div>
+
             </div>
           )}
 
+          {/* DASHBOARD RESULTS */}
           {result && (
             <div className="dashboard animate-slide-up">
               <div className="stats-grid">
@@ -218,6 +246,15 @@ function App() {
           )}
         </>
       )}
+
+      {/* FOOTER */}
+      <footer className="app-footer">
+        <div>EcoAudit - Sustainable Web Engineering Dashboard</div>
+        <div className="footer-credit">
+          Developed by Lakshmi Prajapati
+        </div>
+      </footer>
+
     </div>
   )
 }
