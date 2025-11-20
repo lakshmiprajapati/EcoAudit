@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Environment Variables (Never commit keys!)
+.env
+.env.local
+
+# OS System Files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
