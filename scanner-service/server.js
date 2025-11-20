@@ -6,59 +6,94 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
-// Middleware
 app.use(cors());
-app.use(express.json()); // Allows us to parse JSON bodies
+app.use(express.json());
 
-// Basic Health Check Endpoint
-app.get('/', (req, res) => {
-    res.send('Scanner Service is Running...');
-});
-
-// The Core Scan Endpoint
 app.post('/scan', async (req, res) => {
     const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
 
-    if (!url) {
-        return res.status(400).json({ error: 'URL is required' });
-    }
+    console.log(`Starting Carbon Scan for: ${url}`);
 
-    console.log(`Received scan request for: ${url}`);
-
+    let browser;
     try {
-        // 1. Launch the browser
-        const browser = await puppeteer.launch({
-            headless: "new", // Run in background without UI
-            args: ['--no-sandbox'] // Required for some server environments
+        browser = await puppeteer.launch({
+            headless: "new",
+            args: ['--no-sandbox']
         });
 
-        // 2. Open a new page
         const page = await browser.newPage();
 
-        // 3. Navigate to the URL (wait until network is idle for accurate measurement)
-        await page.goto(url, { waitUntil: 'networkidle2' });
+        // --- DATA COLLECTION VARIABLES ---
+        let totalBytes = 0;
+        const resources = {
+            'image': 0,
+            'script': 0,
+            'stylesheet': 0,
+            'other': 0
+        };
 
-        // 4. Extract Basic Data (Title) - Just a test for now
-        const pageTitle = await page.title();
+        // --- THE INTERCEPTOR ---
+        // This event fires every time a file finishes downloading
+        page.on('response', async (response) => {
+            try {
+                // 1. Get the resource type (e.g., 'image', 'script')
+                const type = response.request().resourceType();
+                
+                // 2. Calculate size
+                // We try to get the 'content-length' header (compressed size).
+                // If missing, we use the buffer size (uncompressed fallback).
+                const headers = response.headers();
+                let size = 0;
 
-        // 5. Close browser
+                if (headers['content-length']) {
+                    size = parseInt(headers['content-length'], 10);
+                } else {
+                    // Fallback: This is heavier but necessary if server uses chunked encoding
+                    const buffer = await response.buffer();
+                    size = buffer.length;
+                }
+
+                // 3. Add to totals
+                totalBytes += size;
+                if (resources[type] !== undefined) {
+                    resources[type] += size;
+                } else {
+                    resources['other'] += size;
+                }
+
+            } catch (err) {
+                // Some responses (like redirects) might fail to buffer, that's okay.
+            }
+        });
+
+        // --- NAVIGATION ---
+        // We wait for 'networkidle0' -> No network connections for at least 500ms
+        await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+
         await browser.close();
 
-        // 6. Send response
+        // --- REPORTING ---
+        // Convert bytes to Megabytes for readability in logs
+        const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
+        console.log(`Scan Complete. Total: ${totalMB} MB`);
+
         res.json({
             success: true,
             url: url,
-            title: pageTitle,
-            message: "Puppeteer successfully visited the page!"
+            metrics: {
+                totalBytes: totalBytes,
+                resources: resources
+            }
         });
 
     } catch (error) {
-        console.error("Puppeteer Error:", error);
-        res.status(500).json({ error: "Failed to scan website", details: error.message });
+        console.error("Scan Error:", error);
+        if (browser) await browser.close();
+        res.status(500).json({ error: "Scan failed", details: error.message });
     }
 });
 
-// Start Server
 app.listen(PORT, () => {
-    console.log(`Scanner Service running on http://localhost:${PORT}`);
+    console.log(`Carbon Scanner running on port ${PORT}`);
 });
