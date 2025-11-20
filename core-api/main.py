@@ -2,64 +2,77 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import httpx # New library for calling the scanner
 
 app = FastAPI(title="EcoAudit Calculation Engine")
 
+# --- CONFIG ---
+SCANNER_URL = "http://localhost:3000/scan"
+
 # --- DATA MODELS ---
 class AuditRequest(BaseModel):
-    total_bytes: int
     url: str
-    region: Optional[str] = "global" # Default to global if not specified
+    region: Optional[str] = "global"
 
 # --- CONSTANTS ---
-# kWh per GB (The "Energy Cost" of moving data)
 KWH_PER_GB = 0.81 
-
-# Carbon Intensity (gCO2 per kWh) - Source: Ember/OurWorldInData (2023 approx)
-# This acts as your "Smart Database"
 GRID_INTENSITY_MAP = {
-    "global": 442,      # World Average
-    "us": 380,          # United States
-    "in": 725,          # India (Coal heavy)
-    "fr": 56,           # France (Nuclear heavy)
-    "se": 13,           # Sweden (Renewable heavy)
-    "de": 350,          # Germany
-    "cn": 530           # China
+    "global": 442, "us": 380, "in": 725, 
+    "fr": 56, "se": 13, "de": 350, "cn": 530
 }
 
 @app.get("/")
 def root():
-    return {"message": "Smart Calculation Engine Ready"}
+    return {"message": "EcoAudit Orchestrator Ready"}
 
-@app.post("/calculate")
-def calculate_footprint(data: AuditRequest):
-    # 1. Determine Carbon Intensity based on Region
-    region_key = data.region.lower()
-    
-    # If region not found, fallback to global
+@app.post("/audit")
+async def perform_full_audit(request: AuditRequest):
+    """
+    The Master Endpoint:
+    1. Calls Node.js Scanner to get bytes.
+    2. Calculates Carbon.
+    3. Returns full report.
+    """
+    print(f"🌐 Starting Audit for: {request.url}")
+
+    # STEP 1: Call the Scanner Service (Node.js)
+    try:
+        async with httpx.AsyncClient() as client:
+            # We send the URL to the scanner
+            response = await client.post(SCANNER_URL, json={"url": request.url}, timeout=30.0)
+            response.raise_for_status() # Error if scanner fails
+            scan_data = response.json()
+            
+            # Extract the bytes from the scanner's response
+            total_bytes = scan_data['metrics']['totalBytes']
+            resource_breakdown = scan_data['metrics']['resources']
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scanner Service Failed: {str(e)}")
+
+    # STEP 2: Calculate Carbon (The Math)
+    region_key = request.region.lower()
     carbon_intensity = GRID_INTENSITY_MAP.get(region_key, GRID_INTENSITY_MAP["global"])
     
-    # 2. The Math
-    size_gb = data.total_bytes / (1024 * 1024 * 1024)
+    size_gb = total_bytes / (1024 * 1024 * 1024)
     energy_kwh = size_gb * KWH_PER_GB
     carbon_grams = energy_kwh * carbon_intensity
     
-    # 3. Benchmarking (Compare to Global Average)
-    global_grams = energy_kwh * GRID_INTENSITY_MAP["global"]
-    saving = global_grams - carbon_grams
-    
+    # STEP 3: Return the Unified Report
     return {
-        "url": data.url,
-        "meta": {
-            "region_used": region_key,
-            "carbon_intensity_factor": carbon_intensity
+        "url": request.url,
+        "timestamp": "Just now",
+        "environment": {
+            "region": region_key,
+            "intensity": carbon_intensity
         },
-        "metrics": {
-            "size_gb": round(size_gb, 5),
-            "energy_kwh": round(energy_kwh, 5),
-            "co2_grams": round(carbon_grams, 3)
+        "network_metrics": {
+            "total_bytes": total_bytes,
+            "breakdown": resource_breakdown
         },
-        "benchmark": {
-            "vs_global_average": f"{round(saving, 3)}g {'saved' if saving > 0 else 'more'} than average"
+        "carbon_report": {
+            "energy_usage_kwh": round(energy_kwh, 5),
+            "carbon_footprint_grams": round(carbon_grams, 3),
+            "grade": "A" if carbon_grams < 0.5 else "F" # Simple grading logic
         }
     }
