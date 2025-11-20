@@ -7,6 +7,7 @@ import { Doughnut } from 'react-chartjs-2';
 import './App.css';
 import Integration from './Integration'; // Import the new page
 
+
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 function App() {
