@@ -96,7 +96,7 @@ function App() {
             <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
               <div style={{ fontSize: '14px', color: '#777' }}>Carbon Footprint</div>
               <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {result.co2_grams} g
+                {result.co2_grams.toFixed(3)} g
               </div>
               <div style={{ fontSize: '12px', color: '#999' }}>CO2e per visit</div>
             </div>
@@ -105,14 +105,59 @@ function App() {
             <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
               <div style={{ fontSize: '14px', color: '#777' }}>Page Weight</div>
               <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                {(result.total_bytes / 1024).toFixed(0)} KB
+                {(result.total_bytes / 1024).toFixed(1)} KB
               </div>
             </div>
+            {/* ML Prediction Card */}
+            <div style={{ padding: '15px', background: '#e8f6f3', borderRadius: '8px', border: '1px solid #27ae60' }}>
+              <div style={{ fontSize: '14px', color: '#27ae60', fontWeight: 'bold' }}>🤖 AI Projection</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                {result.annual_projection_kg?.toFixed(2)} kg
+              </div>
+              <div style={{ fontSize: '12px', color: '#555' }}>Annual CO2 (Predicted)</div>
+            </div>
           </div>
+          
 
           <p style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
             *Calculated using {result.region.toUpperCase()} grid intensity ({result.energy_kwh.toFixed(6)} kWh energy usage).
           </p>
+          {/* --- NEW ACTION PLAN SECTION --- */}
+          {result.recommendations && result.recommendations.length > 0 && (
+            <div style={{ marginTop: '30px', textAlign: 'left' }}>
+              <h3>🛠️ Optimization Action Plan</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                
+                {result.recommendations.map((rec, index) => (
+                  <div key={index} style={{ 
+                    border: '1px solid #eee', 
+                    padding: '15px', 
+                    borderRadius: '8px',
+                    borderLeft: rec.priority === 'High' ? '5px solid #e74c3c' : '5px solid #f1c40f',
+                    background: 'white'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <strong style={{ fontSize: '16px' }}>{rec.title}</strong>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        background: rec.priority === 'High' ? '#ffebee' : '#fff8e1',
+                        color: rec.priority === 'High' ? '#c62828' : '#f57f17',
+                        padding: '2px 8px',
+                        borderRadius: '10px'
+                      }}>
+                        {rec.priority} Priority
+                      </span>
+                    </div>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#555' }}>{rec.desc}</p>
+                    <div style={{ fontSize: '13px', color: '#27ae60', fontWeight: 'bold' }}>
+                      🌱 {rec.impact}
+                    </div>
+                  </div>
+                ))}
+
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
