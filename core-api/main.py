@@ -12,7 +12,7 @@ from models import ScanResult
 
 from pydantic import BaseModel
 from typing import Optional
-
+from fastapi.middleware.cors import CORSMiddleware
 # --- APP LIFECYCLE ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +20,13 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="EcoAudit Calculation Engine", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace "*" with your actual domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- CONFIG ---
 SCANNER_URL = "http://localhost:3000/scan"
